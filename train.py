@@ -25,6 +25,9 @@ def get_args():
     parser.add_argument('--max-tokens', default=None, type=int, help='maximum number of tokens in a batch')
     parser.add_argument('--batch-size', default=1, type=int, help='maximum number of sentences in a batch')
     parser.add_argument('--train-on-tiny', action='store_true', help='train model on a tiny dataset')
+    parser.add_argument('--bpe', default=None, type=str, help='whether to use bpe')
+    parser.add_argument('--bpedropout', required = False, default = "", help='whether to use bpe')
+
 
     # Add model arguments
     parser.add_argument('--arch', default='lstm', choices=ARCH_MODEL_REGISTRY.keys(), help='model architecture')
@@ -63,20 +66,37 @@ def main(args):
     utils.init_logging(args)
 
     # Load dictionaries
-    src_dict = Dictionary.load(os.path.join(args.data, 'dict.{:s}'.format(args.source_lang)))
-    logging.info('Loaded a source dictionary ({:s}) with {:d} words'.format(args.source_lang, len(src_dict)))
-    tgt_dict = Dictionary.load(os.path.join(args.data, 'dict.{:s}'.format(args.target_lang)))
-    logging.info('Loaded a target dictionary ({:s}) with {:d} words'.format(args.target_lang, len(tgt_dict)))
-
-    # Load datasets
-    def load_data(split):
-        return Seq2SeqDataset(
-            src_file=os.path.join(args.data, '{:s}.{:s}'.format(split, args.source_lang)),
-            tgt_file=os.path.join(args.data, '{:s}.{:s}'.format(split, args.target_lang)),
-            src_dict=src_dict, tgt_dict=tgt_dict)
-
-    train_dataset = load_data(split='train') if not args.train_on_tiny else load_data(split='tiny_train')
-    valid_dataset = load_data(split='valid')
+    if args.bpe:
+        
+        src_dict = Dictionary.load(os.path.join(args.data, 'dictbpe.{:s}'.format(args.source_lang)))
+        logging.info('Loaded a source dictionary (BPE) ({:s}) with {:d} words'.format(args.source_lang, len(src_dict)))
+        tgt_dict = Dictionary.load(os.path.join(args.data, 'dictbpe.{:s}'.format(args.target_lang)))
+        logging.info('Loaded a target dictionary (BPE) ({:s}) with {:d} words'.format(args.target_lang, len(tgt_dict)))
+    
+        # Load datasets
+        def load_data_bpe(split):
+            return Seq2SeqDataset(
+                src_file=os.path.join(args.data, '{:s}.{:s}bpe'.format(split, args.source_lang)),
+                tgt_file=os.path.join(args.data, '{:s}.{:s}bpe'.format(split, args.target_lang)),
+                src_dict=src_dict, tgt_dict=tgt_dict)
+    
+        train_dataset = load_data_bpe(split='train') if not args.train_on_tiny else load_data_bpe(split='tiny_train')
+        valid_dataset = load_data_bpe(split='valid')
+    else:
+        src_dict = Dictionary.load(os.path.join(args.data, 'dict.{:s}'.format(args.source_lang)))
+        logging.info('Loaded a source dictionary ({:s}) with {:d} words'.format(args.source_lang, len(src_dict)))
+        tgt_dict = Dictionary.load(os.path.join(args.data, 'dict.{:s}'.format(args.target_lang)))
+        logging.info('Loaded a target dictionary ({:s}) with {:d} words'.format(args.target_lang, len(tgt_dict)))
+    
+        # Load datasets
+        def load_data(split):
+            return Seq2SeqDataset(
+                src_file=os.path.join(args.data, '{:s}.{:s}'.format(split, args.source_lang)),
+                tgt_file=os.path.join(args.data, '{:s}.{:s}'.format(split, args.target_lang)),
+                src_dict=src_dict, tgt_dict=tgt_dict)
+    
+        train_dataset = load_data(split='train') if not args.train_on_tiny else load_data(split='tiny_train')
+        valid_dataset = load_data(split='valid')
 
     # Build model and optimization criterion
     model = models.build_model(args, src_dict, tgt_dict)
@@ -98,6 +118,27 @@ def main(args):
     best_validate = float('inf')
 
     for epoch in range(last_epoch + 1, args.max_epoch):
+        if args.bpedropout:
+            dest=args.data
+            dbase=dest.split('/')[:-2]
+            dbase='/'.join([str(elem) for elem in dbase])
+            dtrain=dbase+'/'+'preprocessed/train'
+            dvalid=dbase+'/'+'preprocessed/valid'
+            dtest=dbase+'/'+'preprocessed/test'
+            dtinytrain=dbase+'/'+'preprocessed/tiny_train'
+            
+            command='python preprocess_wBPE.py --source-lang '+args.source_lang+' --target-lang '+args.target_lang+' --dest-dir '+args.data+\
+            ' --train-prefix '+dtrain+' --valid-prefix '+dvalid+ ' --test-prefix '+ dtest + ' --tiny-train-prefix '+dtinytrain+\
+            ' --threshold-src 1 --threshold-tgt 1 --num-words-src 4000 --num-words-tgt 4000 --bpedropout '+str(args.bpedropout)+\
+            ' --bpe True' 
+            os.system(command)
+            train_dataset = load_data_bpe(split='train') if not args.train_on_tiny else load_data_bpe(split='tiny_train')
+
+
+            
+            
+            
+            
         train_loader = \
             torch.utils.data.DataLoader(train_dataset, num_workers=1, collate_fn=train_dataset.collater,
                                         batch_sampler=BatchSampler(train_dataset, args.max_tokens, args.batch_size, 1,

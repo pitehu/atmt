@@ -1,0 +1,6 @@
+python train.py \
+    --data ./data/en-fr/ \
+    --source-lang en \
+    --target-lang sv \
+    --save-dir path/to/model/checkpoints \
+    --train-on-tiny # for testing purposes only

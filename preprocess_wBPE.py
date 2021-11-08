@@ -41,6 +41,8 @@ def get_args():
                         help='map words appearing less than threshold times to unknown')
     parser.add_argument('--num-words-tgt', default=-1, type=int, help='number of target words to retain')
     parser.add_argument('--bpe', default=None, type=str, help='whether to use bpe')
+    parser.add_argument('--bpedropout', required = False, default = "", help='whether to use bpe')
+
     parser.add_argument('--vocab-src', default=None, type=str, help='path to dictionary')
     parser.add_argument('--vocab-trg', default=None, type=str, help='path to dictionary')
     parser.add_argument('--quiet', action='store_true', help='no logging')
@@ -73,6 +75,13 @@ def main(args):
                                 dictionary)
         if args.test_prefix is not None:
             make_binary_dataset(args.test_prefix + '.' + lang, os.path.join(args.dest_dir, 'test.' + lang+'bpe'), dictionary)
+    def make_split_datasets_bpe_dropout(lang, dictionary):
+        if args.train_prefix is not None:
+            make_binary_dataset(args.train_prefix + '.' + lang, os.path.join(args.dest_dir, 'train.' + lang +'bpe'),
+                                dictionary)
+        if args.tiny_train_prefix is not None:
+            make_binary_dataset(args.tiny_train_prefix + '.' + lang, os.path.join(args.dest_dir, 'tiny_train.' + lang+'bpe'),
+                                dictionary)
 
     os.makedirs(args.dest_dir, exist_ok=True)
     
@@ -96,23 +105,43 @@ def main(args):
 #
     if args.bpe:
         
-        command_learn_bpe_src='subword-nmt learn-bpe -s '+str(args.num_words_src)+' -i '+args.train_prefix + '.' + args.source_lang+' -o '+os.path.join(args.dest_dir, 'dictbpe.' + args.source_lang) 
+        command_learn_bpe_src='subword-nmt learn-bpe -s '+str(args.num_words_src+1000)+' -i '+args.train_prefix + '.' + args.source_lang+' -o '+os.path.join(args.dest_dir, 'dictbpe.' + args.source_lang) 
         print(command_learn_bpe_src)
-        command_learn_bpe_tgt='subword-nmt learn-bpe -s '+str(args.num_words_tgt)+' -i '+args.train_prefix + '.' + args.target_lang+' -o '+os.path.join(args.dest_dir, 'dictbpe.' + args.target_lang) 
+        command_learn_bpe_tgt='subword-nmt learn-bpe -s '+str(args.num_words_tgt+1000)+' -i '+args.train_prefix + '.' + args.target_lang+' -o '+os.path.join(args.dest_dir, 'dictbpe.' + args.target_lang) 
         print(command_learn_bpe_tgt)
         os.system(command_learn_bpe_src)
         os.system(command_learn_bpe_tgt)
     
-        command_apply_bpe_src='subword-nmt apply-bpe -c '+os.path.join(args.dest_dir, 'dictbpe.' + args.source_lang)+' -i '+args.train_prefix + '.' + args.source_lang+' -o '+args.train_prefix + '.' + args.source_lang+'bpe'
-        command_apply_bpe_tgt='subword-nmt apply-bpe -c '+os.path.join(args.dest_dir, 'dictbpe.' + args.target_lang)+' -i '+args.train_prefix + '.' + args.target_lang+' -o '+args.train_prefix + '.' + args.target_lang+'bpe'
+        if args.bpedropout:
+            command_apply_bpe_src='subword-nmt apply-bpe -c '+os.path.join(args.dest_dir, 'dictbpe.' + args.source_lang)+' -i '+args.train_prefix + '.' + args.source_lang+' -o '+args.train_prefix + '.' + args.source_lang+'bpe' + ' --dropout '+ str(args.bpedropout)
+            command_apply_bpe_tgt='subword-nmt apply-bpe -c '+os.path.join(args.dest_dir, 'dictbpe.' + args.target_lang)+' -i '+args.train_prefix + '.' + args.target_lang+' -o '+args.train_prefix + '.' + args.target_lang+'bpe' + ' --dropout '+ str(args.bpedropout)
+        else:
+            command_apply_bpe_src='subword-nmt apply-bpe -c '+os.path.join(args.dest_dir, 'dictbpe.' + args.source_lang)+' -i '+args.train_prefix + '.' + args.source_lang+' -o '+args.train_prefix + '.' + args.source_lang+'bpe'
+            command_apply_bpe_tgt='subword-nmt apply-bpe -c '+os.path.join(args.dest_dir, 'dictbpe.' + args.target_lang)+' -i '+args.train_prefix + '.' + args.target_lang+' -o '+args.train_prefix + '.' + args.target_lang+'bpe'
+        
+        print(command_apply_bpe_src)
+        print(command_apply_bpe_tgt)
+
         os.system(command_apply_bpe_src)
         os.system(command_apply_bpe_tgt)
         
-        src_dict = Dictionary.load(os.path.join(args.dest_dir, 'dictbpe.' + args.source_lang))
-        tgt_dict = Dictionary.load(os.path.join(args.dest_dir, 'dictbpe.' + args.target_lang))
         
-        make_split_datasets_bpe(args.source_lang, src_dict)
-        make_split_datasets_bpe(args.target_lang, tgt_dict)
+        src_dict = build_dictionary([args.train_prefix + '.' + args.source_lang+'bpe'])
+        src_dict.finalize(threshold=args.threshold_src, num_words=args.num_words_src)
+
+        src_dict.save(os.path.join(args.dest_dir, 'dictbpe.' + args.source_lang))
+
+        tgt_dict = build_dictionary([args.train_prefix + '.' + args.target_lang+'bpe'])
+        tgt_dict.finalize(threshold=args.threshold_tgt, num_words=args.num_words_tgt)
+
+        tgt_dict.save(os.path.join(args.dest_dir, 'dictbpe.' + args.target_lang))
+        if args.bpedropout:
+            make_split_datasets_bpe_dropout(args.source_lang, src_dict)
+            make_split_datasets_bpe_dropout(args.target_lang, tgt_dict)
+        else:
+    
+            make_split_datasets_bpe(args.source_lang, src_dict)
+            make_split_datasets_bpe(args.target_lang, tgt_dict)
 
     else:
         if not args.vocab_src:

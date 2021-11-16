@@ -1,8 +1,51 @@
+# Additional Requirement
+
+We include all result files in ./results/ 
+
+We include a processed sample dataset with BPE in ./data_bpe/ 
+
+We require the subword-nmt library for BPE operations. You can then install using the following: 
+
+pip install subword-nmt
+
+To process the training data with BPE (change the number of merges directly in the .py file):
+
+```
+python preprocess_wBPEdropout.py \
+    --source-lang fr \
+    --target-lang en \
+    --dest-dir ./data/en-fr/prepared \
+    --train-prefix ./data/en-fr/preprocessed/train \
+    --valid-prefix ./data/en-fr/preprocessed/valid \
+    --test-prefix ./data/en-fr/preprocessed/test \
+    --tiny-train-prefix ./data/en-fr/preprocessed/tiny_train \
+    --threshold-src 1 \
+    --threshold-tgt 1 \
+    --num-words-src 4000 \
+    --num-words-tgt 4000 \
+	--bpedropout 0.1 \
+	--bpe True 
+```
+
+To run model training with BPE:
+
+```
+python train.py \
+    --data path/to/prepared/data \
+    --source-lang en \
+    --target-lang sv \
+    --save-dir path/to/model/checkpoints \
+    --train-on-tiny \ # for testing purposes only
+	--bpe True \
+	--bpedropout 0.1 \
+```
+
 # atmt code base
 Materials for the first assignment of "Advanced Techniques of Machine Translation".
 Please refer to the assignment sheet for instructions on how to use the toolkit.
 
 The toolkit is based on [this implementation](https://github.com/demelin/nmt_toolkit).
+
 
 # Environment Setup
 

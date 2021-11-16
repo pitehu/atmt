@@ -79,7 +79,11 @@ def main(args):
                 src_file=os.path.join(args.data, '{:s}.{:s}bpe'.format(split, args.source_lang)),
                 tgt_file=os.path.join(args.data, '{:s}.{:s}bpe'.format(split, args.target_lang)),
                 src_dict=src_dict, tgt_dict=tgt_dict)
-    
+        src_file=os.path.join(args.data, '{:s}.{:s}bpe'.format("train", args.source_lang)),
+        tgt_file=os.path.join(args.data, '{:s}.{:s}bpe'.format("train", args.target_lang))
+        print("loading source data...", src_file)
+        print("loading target data...", tgt_file)
+
         train_dataset = load_data_bpe(split='train') if not args.train_on_tiny else load_data_bpe(split='tiny_train')
         valid_dataset = load_data_bpe(split='valid')
     else:
@@ -119,6 +123,7 @@ def main(args):
 
     for epoch in range(last_epoch + 1, args.max_epoch):
         if args.bpedropout:
+            """regenerate a new set of training files at every epoch"""
             dest=args.data
             dbase=dest.split('/')[:-2]
             dbase='/'.join([str(elem) for elem in dbase])
@@ -126,11 +131,15 @@ def main(args):
             dvalid=dbase+'/'+'preprocessed/valid'
             dtest=dbase+'/'+'preprocessed/test'
             dtinytrain=dbase+'/'+'preprocessed/tiny_train'
+            src_dict_path=os.path.join(args.data, 'dictbpe.{:s}'.format(args.source_lang))
+            tgt_dict_path = os.path.join(args.data, 'dictbpe.{:s}'.format(args.target_lang))
+
             
-            command='python preprocess_wBPE.py --source-lang '+args.source_lang+' --target-lang '+args.target_lang+' --dest-dir '+args.data+\
+            command='python preprocess_wBPEdropout.py --source-lang '+args.source_lang+' --target-lang '+args.target_lang+' --dest-dir '+args.data+\
             ' --train-prefix '+dtrain+' --valid-prefix '+dvalid+ ' --test-prefix '+ dtest + ' --tiny-train-prefix '+dtinytrain+\
-            ' --threshold-src 1 --threshold-tgt 1 --num-words-src 4000 --num-words-tgt 4000 --bpedropout '+str(args.bpedropout)+\
+            ' --threshold-src 1 --threshold-tgt 1 --num-words-src 4000 --num-words-tgt 4000 '+' --vocab-src '+src_dict_path+' --vocab-trg '+tgt_dict_path+' --bpedropout '+str(args.bpedropout)+\
             ' --bpe True' 
+
             os.system(command)
             train_dataset = load_data_bpe(split='train') if not args.train_on_tiny else load_data_bpe(split='tiny_train')
 

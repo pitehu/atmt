@@ -15,8 +15,9 @@ from seq2seq.data.dataset import Seq2SeqDataset, BatchSampler
 def get_args():
     """ Defines generation-specific hyper-parameters. """
     parser = argparse.ArgumentParser('Sequence to Sequence Model')
-    parser.add_argument('--cuda', default=False, help='Use a GPU')
+    parser.add_argument('--cuda', default=True, help='Use a GPU')
     parser.add_argument('--seed', default=42, type=int, help='pseudo random number generator seed')
+    parser.add_argument('--bpe', default=None, type=str, help='whether to use bpe')
 
     # Add data arguments
     parser.add_argument('--data', required=True, help='path to data directory')
@@ -38,21 +39,39 @@ def main(args):
     args = args_loaded
     utils.init_logging(args)
 
-    # Load dictionaries
-    src_dict = Dictionary.load(os.path.join(args.dicts, 'dict.{:s}'.format(args.source_lang)))
-    logging.info('Loaded a source dictionary ({:s}) with {:d} words'.format(args.source_lang, len(src_dict)))
-    tgt_dict = Dictionary.load(os.path.join(args.dicts, 'dict.{:s}'.format(args.target_lang)))
-    logging.info('Loaded a target dictionary ({:s}) with {:d} words'.format(args.target_lang, len(tgt_dict)))
 
-    # Load dataset
-    test_dataset = Seq2SeqDataset(
-        src_file=os.path.join(args.data, 'test.{:s}'.format(args.source_lang)),
-        tgt_file=os.path.join(args.data, 'test.{:s}'.format(args.target_lang)),
-        src_dict=src_dict, tgt_dict=tgt_dict)
-    test_loader = torch.utils.data.DataLoader(test_dataset, num_workers=1, collate_fn=test_dataset.collater,
-                                              batch_sampler=BatchSampler(test_dataset, 9999999,
-                                                                         args.batch_size, 1, 0, shuffle=False,
-                                                                         seed=args.seed))
+    if args.bpe:
+        
+        src_dict = Dictionary.load(os.path.join(args.data, 'dictbpe.{:s}'.format(args.source_lang)))
+        logging.info('Loaded a source dictionary (BPE) ({:s}) with {:d} words'.format(args.source_lang, len(src_dict)))
+        tgt_dict = Dictionary.load(os.path.join(args.data, 'dictbpe.{:s}'.format(args.target_lang)))
+        logging.info('Loaded a target dictionary (BPE) ({:s}) with {:d} words'.format(args.target_lang, len(tgt_dict)))
+    
+        # Load datasets
+        test_dataset = Seq2SeqDataset(
+            src_file=os.path.join(args.data, 'test.{:s}bpe'.format(args.source_lang)),
+            tgt_file=os.path.join(args.data, 'test.{:s}bpe'.format(args.target_lang)),
+            src_dict=src_dict, tgt_dict=tgt_dict)
+        test_loader = torch.utils.data.DataLoader(test_dataset, num_workers=1, collate_fn=test_dataset.collater,
+                                                  batch_sampler=BatchSampler(test_dataset, 9999999,
+                                                                             args.batch_size, 1, 0, shuffle=False,
+                                                                             seed=args.seed))
+    else:
+    # Load dictionaries
+        src_dict = Dictionary.load(os.path.join(args.dicts, 'dict.{:s}'.format(args.source_lang)))
+        logging.info('Loaded a source dictionary ({:s}) with {:d} words'.format(args.source_lang, len(src_dict)))
+        tgt_dict = Dictionary.load(os.path.join(args.dicts, 'dict.{:s}'.format(args.target_lang)))
+        logging.info('Loaded a target dictionary ({:s}) with {:d} words'.format(args.target_lang, len(tgt_dict)))
+    
+        # Load dataset
+        test_dataset = Seq2SeqDataset(
+            src_file=os.path.join(args.data, 'test.{:s}'.format(args.source_lang)),
+            tgt_file=os.path.join(args.data, 'test.{:s}'.format(args.target_lang)),
+            src_dict=src_dict, tgt_dict=tgt_dict)
+        test_loader = torch.utils.data.DataLoader(test_dataset, num_workers=1, collate_fn=test_dataset.collater,
+                                                  batch_sampler=BatchSampler(test_dataset, 9999999,
+                                                                             args.batch_size, 1, 0, shuffle=False,
+                                                                             seed=args.seed))
     # Build model and criterion
     model = models.build_model(args, src_dict, tgt_dict)
     if args.cuda:

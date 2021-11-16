@@ -1,5 +1,7 @@
 # Additional Requirement
 
+Our report is ./tianhu+yucjia_atmt_assignment03.pdf
+
 We include all result files in ./results/ 
 
 We include a processed sample dataset with BPE in ./data_bpe/ 
